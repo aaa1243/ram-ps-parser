@@ -1,0 +1,50 @@
+name: Build EXE
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test parser on a generated dump
+        shell: pwsh
+        run: |
+          .\tests\New-TestDump.ps1 -Path .\test.raw
+          .\RAMPSParser.ps1 -Path .\test.raw -OutDir .\testout -ChunkBytes 1001 -NoOpen
+          $csv = Import-Csv .\testout\suspicious.csv
+          if ($csv.Count -lt 4) { throw "Expected at least 4 suspicious hits, got $($csv.Count)" }
+          Write-Host "Test passed: $($csv.Count) suspicious hits"
+
+      - name: Install ps2exe
+        shell: pwsh
+        run: Install-Module ps2exe -Scope CurrentUser -Force
+
+      - name: Build EXE
+        shell: pwsh
+        run: |
+          Invoke-ps2exe -inputFile .\RAMPSParser.ps1 `
+            -outputFile .\RAMPSParser.exe `
+            -title "RAM PowerShell Parser" `
+            -product "RAM PowerShell Parser" `
+            -version "1.0.0"
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: RAMPSParser
+          path: RAMPSParser.exe
+
+      - name: Publish release (only on version tags)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: RAMPSParser.exe
