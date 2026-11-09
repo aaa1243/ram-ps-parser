@@ -1,0 +1,8 @@
+# Never commit RAM dumps or results (huge, and they contain private data)
+*.raw
+*.mem
+*.dmp
+*.vmem
+testout/
+RAMPS/
+*.exe
